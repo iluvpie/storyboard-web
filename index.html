@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob: file:; style-src 'self' 'unsafe-inline'; script-src 'self'">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>Storyboard</title>
+  <!-- The iPad home-screen app (the web version; the desktop app ignores these). -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Storyboard">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header id="topbar">
+    <div class="tb-left">
+      <div class="brand"><span class="brand-mark"></span><span id="projectName">Untitled</span><span id="dirtyDot" title="Unsaved changes" hidden></span></div>
+      <nav class="file-menu">
+        <button id="newProject" class="text-btn" title="New board (Ctrl+N)">New</button>
+        <button id="open" class="text-btn" title="Open (Ctrl+O)">Open</button>
+        <button id="save" class="text-btn" title="Save (Ctrl+S)">Save</button>
+        <button id="exportBtn" class="text-btn" title="Export a video or board sheets (Ctrl+E)">Export</button>
+        <button id="backupsBtn" class="text-btn" title="Earlier versions of your boards, kept automatically (not in your folders)">Backups</button>
+      </nav>
+    </div>
+    <div class="tools" id="tools">
+      <button class="tool" data-tool="brush" title="Brush (B)"><i data-icon="brush"></i></button>
+      <button class="tool" data-tool="eraser" title="Eraser (E)"><i data-icon="eraser"></i></button>
+      <button class="tool" data-tool="fill" title="Fill (G)"><i data-icon="fill"></i></button>
+      <button class="tool" data-tool="move" title="Move (V): drag to move the layer, or the selection if there is one"><i data-icon="move"></i></button>
+      <button class="tool" data-tool="lasso" title="Lasso (L). Shift adds to the selection, Ctrl cuts from it"><i data-icon="lasso"></i></button>
+      <button class="tool" data-tool="perspective" title="Perspective grid (P)"><i data-icon="perspective"></i></button>
+      <button class="tool" data-tool="pan" title="Pan (H, or hold Space)"><i data-icon="hand"></i></button>
+      <span class="tool-sep"></span>
+      <div class="menu-wrap">
+        <button id="adjustBtn" class="tool" title="Adjustments and filters for the layer (or selection)"><i data-icon="wand"></i></button>
+        <div id="adjustMenu" class="menu" hidden>
+          <button id="layerAdjust" class="menu-item">Hue, saturation, brightness</button>
+          <div class="menu-sep"></div>
+          <button class="menu-item" data-blur="gaussian">Gaussian blur</button>
+          <button class="menu-item" data-blur="motion">Motion blur</button>
+          <button class="menu-item" data-blur="perspective">Perspective blur</button>
+          <button class="menu-item" data-blur="glow">Glow</button>
+        </div>
+      </div>
+    </div>
+    <div class="tb-right">
+      <button id="safeBtn" class="icon-btn" title="Safe-area guides"><i data-icon="safe"></i></button>
+      <button id="onionBtn" class="icon-btn" title="Onion skin: show the previous shot (O)"><i data-icon="onion"></i></button>
+      <button id="fitBtn" class="icon-btn" title="Fit to screen and turn upright (0)"><i data-icon="fit"></i></button>
+      <button id="canvasBtn" class="icon-btn" title="Canvas size and frame rate"><i data-icon="canvas"></i></button>
+      <button id="helpBtn" class="icon-btn" title="Shortcuts"><i data-icon="help"></i></button>
+    </div>
+  </header>
+
+  <main id="workspace">
+    <aside id="rail">
+      <button id="undoBtn" class="icon-btn" title="Undo (Ctrl+Z)"><i data-icon="undo"></i></button>
+      <button id="redoBtn" class="icon-btn" title="Redo (Ctrl+Shift+Z)"><i data-icon="redo"></i></button>
+      <div class="rail-slider" title="Brush size ( [ and ] )">
+        <span id="railSizeVal" class="num"></span>
+        <input id="railSize" type="range" min="0" max="100" step="0.5">
+        <span class="rail-label">Size</span>
+      </div>
+      <div class="rail-slider" title="Brush opacity">
+        <span id="railOpacityVal" class="num"></span>
+        <input id="railOpacity" type="range" min="5" max="100">
+        <span class="rail-label">Opacity</span>
+      </div>
+      <div class="rail-color-wrap">
+        <button id="railColor" class="rail-color" title="Colour: shows the colour wheel"></button>
+      </div>
+    </aside>
+
+    <div id="canvasArea">
+      <div id="viewport">
+        <div id="stage">
+          <canvas id="onionCanvas"></canvas>
+          <video id="refVideo" muted playsinline preload="auto"></video>
+          <div id="layerStack"></div>
+          <div id="frame"></div>
+        </div>
+        <div id="gridLayer"></div>
+        <div id="moveLayer"></div>
+        <div id="camLayer"></div>
+        <div id="cursor"></div>
+        <div id="meshBar" hidden>
+          <span class="mesh-title muted"></span>
+          <button id="meshCancel" class="text-btn">Cancel</button>
+          <button id="meshApply" class="text-btn primary">Apply</button>
+        </div>
+        <div id="selBar" hidden>
+          <span id="selHint" class="muted">Selection</span>
+          <button id="selMove" class="text-btn">Move</button>
+          <button id="selFill" class="text-btn">Fill</button>
+          <button id="selClear" class="text-btn">Clear</button>
+          <button id="selDone" class="text-btn">Deselect</button>
+        </div>
+        <div id="captionView" hidden></div>
+        <canvas id="captionCanvas" hidden></canvas>
+        <div id="filterMark"></div>
+        <div id="filterPanel" hidden></div>
+        <div id="adjustPanel" hidden>
+          <div class="adjust-head"><b>Adjust colour</b><span id="adjustLayerName" class="muted"></span></div>
+          <label class="slider-row"><span>Hue</span><input id="adj-h" type="range" min="-180" max="180" value="0"><span id="adj-h-val" class="num">0</span></label>
+          <label class="slider-row"><span>Saturation</span><input id="adj-s" type="range" min="-100" max="100" value="0"><span id="adj-s-val" class="num">0</span></label>
+          <label class="slider-row"><span>Brightness</span><input id="adj-b" type="range" min="-100" max="100" value="0"><span id="adj-b-val" class="num">0</span></label>
+          <div class="adjust-actions"><button id="adjustCancel" class="text-btn">Cancel</button><button id="adjustApply" class="text-btn primary">Apply</button></div>
+        </div>
+      </div>
+      <div id="player" hidden><canvas id="playerCanvas"></canvas></div>
+    </div>
+
+    <aside id="inspector" data-tab="tool">
+      <nav id="tabs">
+        <button class="tab" data-tab="tool"><i data-icon="brush"></i><span id="tabToolName">Brush</span></button>
+        <button class="tab" data-tab="layers"><i data-icon="layers"></i><span>Layers</span></button>
+        <button class="tab" data-tab="shot"><i data-icon="film"></i><span>Shot</span></button>
+      </nav>
+      <section id="secTool" data-pane="tool"></section>
+
+      <section id="secColor" data-pane="tool">
+        <div class="sec-head"><h2>Color</h2></div>
+        <div class="color-row">
+          <label class="color-current" title="Pick any color"><input id="colorPicker" type="color"><span id="colorChip"></span></label>
+          <input id="colorHex" class="field num" maxlength="7" spellcheck="false">
+        </div>
+        <canvas id="wheel" class="wheel" title="Drag the ring for hue, the square for shade"></canvas>
+        <div id="recent" class="swatches recent"></div>
+      </section>
+
+      <section id="secLayers" data-pane="layers">
+        <div class="sec-head">
+          <h2>Layers</h2>
+          <div class="sec-actions">
+            <button id="layerMulti" class="icon-btn sm" title="Select several: tap layers to add or remove them (same as Ctrl-click)"><i data-icon="multi"></i></button>
+            <button id="addLayer" class="icon-btn sm" title="New layer"><i data-icon="plus"></i></button>
+            <button id="copyLayers" class="icon-btn sm" title="Copy the selected layers, or the lasso selection (Ctrl+C)"><i data-icon="copy"></i></button>
+            <button id="pasteLayers" class="icon-btn sm" title="Paste them into this shot (Ctrl+V)"><i data-icon="paste"></i></button>
+            <button id="groupLayers" class="icon-btn sm" title="Put the picked layers in a folder (Ctrl+G). Pick the folder to work on all of it"><i data-icon="folder"></i></button>
+            <button id="extendLayerTop" class="icon-btn sm" title="Extend to next shot: put the picked layers or folder in the next shot too, linked"><i data-icon="link"></i></button>
+            <button id="layerUp" class="icon-btn sm" title="Move layer up"><i data-icon="up"></i></button>
+            <button id="layerDown" class="icon-btn sm" title="Move layer down"><i data-icon="down"></i></button>
+            <button id="delLayer" class="icon-btn sm danger" title="Delete layer"><i data-icon="trash"></i></button>
+          </div>
+        </div>
+        <ul id="layers"></ul>
+        <button id="extendLayer" class="outline-btn wide" title="Put the picked layers or folder in the next shot too, linked: draw a background once and it stays while the characters change on their own layers. Press again to carry it on."><i data-icon="link"></i><span>Extend to next shot</span></button>
+        <div class="link-row">
+          <button id="unlinkLayer" class="text-btn sm" title="Give this shot its own copy, to change without touching the other shots" hidden>Unlink from this shot</button>
+          <button id="ungroupLayers" class="text-btn sm" title="Take the layers out of the folder (Ctrl+Shift+G)" hidden>Ungroup</button>
+        </div>
+        <p id="linkHint" class="hint" hidden></p>
+        <button id="mergeLayers" class="text-btn wide" hidden>Merge layers</button>
+        <p class="hint layers-hint">To pick several layers, Ctrl-click or Shift-click them, or turn on Select several above. Ctrl+G puts them in a folder; pick the folder to move, extend or delete all of it.</p>
+        <label class="slider-row"><span>Layer opacity</span><input id="layerOpacity" type="range" min="0" max="100"><span id="layerOpacityVal" class="num"></span></label>
+        <label class="select-row" title="How this layer mixes with what is under it"><span>Blend</span><select id="layerBlend"></select></label>
+        <label class="slider-row" title="Double-click to reset"><span>Parallax</span><input id="layerParallax" type="range" min="0" max="200" step="5"><span id="layerParallaxVal" class="num"></span></label>
+        <p id="parallaxHint" class="hint"></p>
+      </section>
+
+      <section id="secShot" data-pane="shot">
+        <div class="sec-head">
+          <h2 id="shotTitle">Shot</h2>
+          <div class="sec-actions">
+            <button id="dupShot" class="icon-btn sm" title="Duplicate shot (Ctrl+D)"><i data-icon="duplicate"></i></button>
+            <button id="delShot" class="icon-btn sm danger" title="Delete shot (Shift+Delete)"><i data-icon="trash"></i></button>
+          </div>
+        </div>
+        <textarea id="shotNotes" class="field notes" rows="3" placeholder="Caption: action, dialogue, camera" spellcheck="true"></textarea>
+        <label class="check-row"><input id="captionsOn" type="checkbox"><span>Show captions in playback and export</span></label>
+        <label class="slider-row" title="How big the caption text is. Double-click to reset"><span>Caption size</span><input id="captionSize" type="range" min="12" max="70" step="1"><span id="captionSizeVal" class="num"></span></label>
+        <label class="slider-row" title="How far up from the bottom of the frame the caption sits. Double-click to reset"><span>Caption height</span><input id="captionBottom" type="range" min="0" max="400" step="5"><span id="captionBottomVal" class="num"></span></label>
+      </section>
+
+      <section id="secRef" data-pane="shot" hidden>
+        <div class="sec-head">
+          <h2>Reference video</h2>
+          <div class="sec-actions">
+            <button id="refRemove" class="icon-btn sm danger" title="Remove the reference video"><i data-icon="trash"></i></button>
+          </div>
+        </div>
+        <p id="refName" class="hint"></p>
+        <div class="field-row"><span>Show</span><button id="refShow" class="switch" role="switch"><span></span></button></div>
+        <label class="slider-row"><span>Opacity</span><input id="refOpacity" type="range" min="5" max="100"><span id="refOpacityVal" class="num"></span></label>
+        <p class="hint">It plays under your boards but never goes into exports. Drag its bar in the timeline to line it up.</p>
+      </section>
+    </aside>
+  </main>
+
+  <section id="timeline">
+    <div class="tl-bar">
+      <div class="transport">
+        <button id="tlStart" class="icon-btn" title="Go to start (Home)"><i data-icon="skipStart"></i></button>
+        <button id="tlPrev" class="icon-btn" title="Previous shot (,)"><i data-icon="left"></i></button>
+        <button id="tlPlay" class="icon-btn play" title="Play from the playhead (Enter)"><i data-icon="play"></i></button>
+        <button id="tlNext" class="icon-btn" title="Next shot (.)"><i data-icon="right"></i></button>
+      </div>
+      <div class="tc num"><span id="tcNow">00:00:00</span><span class="muted"> / </span><span id="tcTotal">00:00:00</span></div>
+      <div class="tl-shot">
+        <span id="tlShotName" class="tl-shot-name"></span>
+        <label class="tl-field" title="Length of this shot">Length <input id="duration" class="field num" type="number" min="0.04" step="0.25"><span class="muted">s</span><span id="durationFrames" class="muted num"></span></label>
+        <span class="tl-field" title="Turn on to pan or zoom the camera during this shot. Drag the Start and End frames on the canvas. To change the drawing during the move, split the shot (Ctrl+K): the move carries on across the pieces.">Camera movement <button id="camToggle" class="switch" role="switch" aria-label="Camera movement"><span></span></button></span>
+        <span id="camEaseRow" class="tl-field">
+          <select id="camEase" class="field" title="How the camera move speeds up and slows down">
+            <option value="smooth">Ease in and out</option>
+            <option value="in">Slow start</option>
+            <option value="out">Slow end</option>
+            <option value="linear">Constant speed</option>
+          </select>
+          <button id="camSwap" class="text-btn sm" title="Swap Start and End">Swap</button>
+        </span>
+      </div>
+      <div class="spacer"></div>
+      <button id="tlAddShot" class="text-btn" title="New shot after this one (N)"><i data-icon="plus"></i>Shot</button>
+      <button id="tlSplit" class="text-btn" title="Split the shot at the playhead (Ctrl+K)"><i data-icon="split"></i>Split</button>
+      <button id="tlVideo" class="text-btn" title="Add a video to board over"><i data-icon="film"></i>Video</button>
+      <button id="tlAudio" class="text-btn" title="Add an audio track"><i data-icon="music"></i>Audio</button>
+      <button id="tlFit" class="icon-btn" title="Fit the whole board in the timeline"><i data-icon="fit"></i></button>
+      <input id="tlZoom" type="range" min="0" max="100" title="Timeline zoom: Ctrl or Alt + scroll, = and - keys, \ to fit">
+    </div>
+    <div class="tl-body">
+      <div class="tl-heads">
+        <div class="tl-head tl-head-ruler"></div>
+        <div class="tl-head tl-head-shots">Shots</div>
+        <div class="tl-head tl-head-ref">Video</div>
+        <div class="tl-head tl-head-audio">Audio</div>
+      </div>
+      <div id="tlScroll" class="tl-scroll">
+        <div id="tlContent" class="tl-content">
+          <canvas id="tlRuler"></canvas>
+          <div id="shotTrack" class="tl-track shot-track"></div>
+          <div id="refTrack" class="tl-track ref-track"></div>
+          <div id="audioTrack" class="tl-track audio-track"></div>
+          <div id="playhead"><div class="ph-knob"></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <dialog id="canvasDialog">
+    <form id="canvasForm" method="dialog">
+      <h3 id="cdTitle">Canvas</h3>
+      <div id="cdPresets" class="presets"></div>
+      <div class="dlg-fields">
+        <label>Width <input id="cdW" class="field num" type="number" min="64" max="8192"></label>
+        <label>Height <input id="cdH" class="field num" type="number" min="64" max="8192"></label>
+        <label>Frame rate
+          <select id="cdFps" class="field">
+            <option value="12">12 fps</option>
+            <option value="24">24 fps</option>
+            <option value="25">25 fps</option>
+            <option value="30">30 fps</option>
+          </select>
+        </label>
+      </div>
+      <p id="cdNote" class="hint"></p>
+      <div class="dlg-actions">
+        <button type="button" id="cdCancel" class="text-btn">Cancel</button>
+        <button type="submit" id="cdApply" class="solid-btn">Apply</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="exportChoice">
+    <h3>Export</h3>
+    <div class="choices">
+      <button id="exVideo" class="choice"><b>Video</b><span>MP4 animatic with the audio track</span></button>
+      <button id="exShots" class="choice"><b>Each shot</b><span>One PNG per shot, as it looks in the frame, in a folder</span></button>
+      <button id="exPdf" class="choice"><b>Board sheets</b><span>PDF with each shot numbered, its length and caption; pick how many go on a page below</span></button>
+      <button id="exSource" class="choice wide"><b>Source files</b><span>A .zip with every layer of every shot as a PNG, each shot flattened, and a timing sheet: for people who do not have this app</span></button>
+    </div>
+    <label class="check-row sheet-row">Board sheets: <input type="number" id="exPerPage" min="1" max="30" step="1" class="field num"> shots per page <span id="exPerPageFit" class="muted num"></span></label>
+    <p class="hint">On the video:</p>
+    <label class="check-row"><input type="checkbox" id="exTimecode"> Burn in the timecode (top left)</label>
+    <label class="check-row"><input type="checkbox" id="exShotNo"> Burn in shot numbers (top right)</label>
+    <p class="hint">Captions are burned in when Show captions is on (Shot tab). The audio track is always included.</p>
+    <label class="check-row" id="exSourceBoardRow"><input type="checkbox" id="exSourceBoard" checked> Put the board file (.sboard) in the source zip too</label>
+    <div class="dlg-actions"><button id="exChoiceCancel" class="text-btn">Cancel</button></div>
+  </dialog>
+
+  <dialog id="exportDialog">
+    <h3>Exporting video</h3>
+    <div class="progress"><div id="exBar"></div></div>
+    <p id="exText" class="hint num"></p>
+    <div class="dlg-actions"><button id="exCancel" class="text-btn">Cancel</button></div>
+  </dialog>
+
+  <dialog id="backupDialog">
+    <h3>Backups</h3>
+    <p class="hint">Every save keeps a version here, inside the app, not in your folders. Recent ones are all kept, then one an hour for a day, then one a day for two weeks. Opening one makes a copy; your board's file is never changed.</p>
+    <div id="backupList"></div>
+    <div class="dlg-actions">
+      <button id="backupClose" class="solid-btn">Done</button>
+    </div>
+  </dialog>
+  <dialog id="helpDialog">
+    <h3>Shortcuts</h3>
+    <dl class="keys">
+      <dt>B · E · G · L · P · H</dt><dd>Brush, eraser, fill, lasso, perspective grid, pan</dd>
+      <dt>Tab (hold)</dt><dd>Brush and tool wheel</dd>
+      <dt>1 to 9</dt><dd>Brush presets</dd>
+      <dt>[ ]</dt><dd>Brush size</dd>
+      <dt>Alt + click</dt><dd>Pick a colour from the canvas</dd>
+      <dt>Space + drag</dt><dd>Pan from any tool</dd>
+      <dt>Scroll</dt><dd>Zoom the canvas</dd>
+      <dt>R + drag</dt><dd>Rotate the canvas</dd>
+      <dt>0</dt><dd>Fit to screen and turn upright</dd>
+      <dt>Enter</dt><dd>Play or stop</dd>
+      <dt>Home</dt><dd>Go to start</dd>
+      <dt>, .</dt><dd>Previous or next shot</dd>
+      <dt>Ctrl+C, Ctrl+V</dt><dd>Copy the selected layers (or the lasso selection) and paste them into any shot</dd>
+      <dt>V</dt><dd>Move: drag to move the layer (or the selection); drag a handle to stretch</dd>
+      <dt>Shift</dt><dd>Like Photoshop. Brush: drag to keep a line level or upright. Move: keeps proportions, or locks the direction. Grid points: straight lines</dd>
+      <dt>Alt / Ctrl</dt><dd>Move: Alt stretches from the centre, Ctrl places without snapping. Timeline: Ctrl skips snapping</dd>
+      <dt>= and -</dt><dd>Zoom the timeline in and out (or Ctrl/Alt + scroll); \ fits it</dd>
+      <dt>Arrows</dt><dd>With Move, or a lasso selection: nudge it (Shift for 10px)</dd>
+      <dt>Shift / Ctrl + lasso</dt><dd>Add another area to the selection, or cut one out of it (both: keep only the overlap). Undo takes selections back.</dd>
+      <dt>N · Ctrl+D</dt><dd>New shot, duplicate shot</dd>
+      <dt>Ctrl+K</dt><dd>Split the shot at the playhead</dd>
+      <dt>Shift+Delete</dt><dd>Delete shot</dd>
+      <dt>Delete</dt><dd>Clear the layer, or the selection</dd>
+      <dt>Esc</dt><dd>Deselect</dd>
+      <dt>Drop an image</dt><dd>Adds it as a new layer</dd>
+      <dt>O</dt><dd>Onion skin</dd>
+      <dt>Ctrl+Z · Ctrl+Shift+Z</dt><dd>Undo, redo</dd>
+      <dt>Ctrl+S · Ctrl+O · Ctrl+E</dt><dd>Save, open, export</dd>
+      <dt>Ctrl + scroll</dt><dd>Zoom the timeline</dd>
+      <dt>F2</dt><dd>Drawing speed readout</dd>
+      <dt>Fingers (iPad)</dt><dd>One finger moves the canvas, two pinch to zoom and turn it. Tap with two fingers to undo, three to redo. Only the Pencil draws.</dd>
+    </dl>
+    <div class="dlg-actions">
+      <button id="ipadCheck" class="text-btn" hidden>Check this iPad</button>
+      <button id="speedBtn" class="text-btn">Drawing speed readout</button>
+      <button id="helpClose" class="solid-btn">Done</button>
+    </div>
+  </dialog>
+
+  <div id="toast"></div>
+  <div id="radial" hidden></div>
+
+  <script src="web.js"></script>
+  <script src="vendor/polygon-clipping.min.js"></script>
+  <script src="vendor/mp4-muxer.js"></script>
+  <script src="core.js"></script>
+  <script src="tools.js"></script>
+  <script src="pencil.js"></script>
+  <script src="transform.js"></script>
+  <script src="timeline.js"></script>
+  <script src="playback.js"></script>
+  <script src="reference.js"></script>
+  <script src="camera.js"></script>
+  <script src="grid.js"></script>
+  <script src="io.js"></script>
+  <script src="ui.js"></script>
+  <script src="adjust.js"></script>
+  <script src="filters.js"></script>
+  <script src="selftest.js"></script>
+</body>
+</html>
